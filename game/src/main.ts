@@ -1,47 +1,14 @@
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║  Browser entry point — wires the three layers together               ║
-// ╠══════════════════════════════════════════════════════════════════════╣
-// ║                                                                      ║
-// ║  Read the client side in this order:                                 ║
-// ║                                                                      ║
-// ║    1. THIS FILE                  glues net + scene + HUD             ║
-// ║    2. net/ArenaClient.ts         the only @rivalis/browser import    ║
-// ║    3. game/ArenaScene.ts         Phaser scene — pure game code       ║
-// ║    4. game/{Player,Ghost,...}Sprite.ts   per-entity rendering        ║
-// ║    5. ui/HUD.ts                  DOM form, score, leaderboard        ║
-// ║                                                                      ║
-// ║  Data flow                                                           ║
-// ║                                                                      ║
-// ║       keyboard  ──→  ArenaScene  ──→  ArenaClient.sendInput          ║
-// ║                                            │                         ║
-// ║                                            ▼  WebSocket              ║
-// ║                                       (server runs tick)             ║
-// ║                                            │                         ║
-// ║                                            ▼  ws frames              ║
-// ║       ArenaClient ──→ scene.applySnapshot (renders)                  ║
-// ║                  └──→ hud.set{Status,Score,Leaderboard}              ║
-// ║                                                                      ║
-// ╚══════════════════════════════════════════════════════════════════════╝
-
 import * as Phaser from 'phaser'
 import { ARENA, type ArenaPlayer } from '@rivalis-example/protocol'
 import ArenaClient from './net/ArenaClient'
 import ArenaScene from './game/ArenaScene'
 import HUD from './ui/HUD'
 
-// Server URL. In dev, host = "localhost"; in prod, point at your real host.
 const SERVER_URL = `ws://${location.hostname}:2334`
 
-// Three independent objects, three jobs:
-//   - scene  : draws the game (Phaser only, no Rivalis)
-//   - client : talks to the server (Rivalis only, no Phaser/DOM)
-//   - hud    : DOM form / score / leaderboard (DOM only)
-//
-// `main.ts` is the only file allowed to know about all three.
 const scene = new ArenaScene()
 const client = new ArenaClient()
 
-// Boot Phaser. The scene's `create()` runs once when this is ready.
 new Phaser.Game({
     type: Phaser.AUTO,
     width: ARENA.width,
@@ -61,7 +28,6 @@ const hud = new HUD({
 hud.setStatus('idle')
 hud.setScore(null)
 
-// Scene → Client: forward local key changes as 'input' frames.
 scene.setCallbacks({
     onInput: (input) => client.sendInput(input),
     onScores: (players, id) => {
@@ -70,7 +36,6 @@ scene.setCallbacks({
     }
 })
 
-// Client → Scene + HUD: pipe server events into the game and the UI.
 client.on('status', (status, reason) => {
     hud.setStatus(status, reason)
     if (status === 'disconnected' || status === 'idle') {

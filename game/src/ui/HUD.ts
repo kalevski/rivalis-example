@@ -20,11 +20,6 @@ export type HUDCallbacks = {
     onLeave: () => void
 }
 
-/**
- * All DOM-side UI: the join form, status badge, your-score panel, and the
- * top-5 leaderboard. Has no Rivalis or Phaser imports — gets data piped in
- * from main.ts.
- */
 export default class HUD {
     private nameInput: HTMLInputElement
     private joinBtn: HTMLButtonElement

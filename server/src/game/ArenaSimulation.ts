@@ -61,6 +61,7 @@ function ghostHome(): { x: number; y: number } {
     return tileCenter(ARENA.ghostHomeTx, ARENA.ghostHomeTy)
 }
 
+// 4 corner samples — if any sits on a wall tile, blocked
 function canMoveTo(x: number, y: number): boolean {
     const r = ARENA.playerRadius
     const corners: ReadonlyArray<readonly [number, number]> = [
@@ -75,13 +76,6 @@ function canMoveTo(x: number, y: number): boolean {
     return true
 }
 
-/**
- * Pure game state — knows nothing about Rivalis or networks.
- *
- * Owns the maze, the live pellets, every player's body, and the AI ghosts.
- * The Rivalis adapter (ArenaRoom) drives this via `addPlayer / removePlayer
- * / setInput / tick`; the simulation never imports `@rivalis/core`.
- */
 export default class ArenaSimulation {
     private players = new Map<string, Player>()
     private pellets = new Map<string, Pellet>()
@@ -126,8 +120,6 @@ export default class ArenaSimulation {
 
         if (this.resolvePlayerCollisions(now)) dirty = true
 
-        // Ghosts run scared whenever ANY pacman is energized — easier to
-        // spot the global state in HUD too.
         const anyEnergized = this.isAnyEnergized(now)
         const ghostStep = (anyEnergized ? ARENA.ghostScaredSpeed : ARENA.ghostSpeed) * dt
         for (const g of this.ghosts) {
@@ -172,10 +164,9 @@ export default class ArenaSimulation {
         return { t: now, players, pellets: [...this.pellets.values()], ghosts }
     }
 
-    // -- player movement & pickups --
-
     private movePlayer(p: Player, step: number): boolean {
         const requested = dirFromInput(p.input)
+        // try requested dir, fall back to current — keeps gliding through corridors
         const tryOrder: Direction[] = []
         if (requested) tryOrder.push(requested)
         if (requested !== p.dir) tryOrder.push(p.dir)
@@ -245,12 +236,9 @@ export default class ArenaSimulation {
         return false
     }
 
-    // -- ghosts --
-
     private spawnGhosts(): void {
         const home = ghostHome()
         for (let i = 0; i < ARENA.ghostCount; i++) {
-            // Spread spawn slightly so ghosts don't stack on tile center.
             this.ghosts.push({
                 id: `g${i}`,
                 color: GHOST_COLORS[i % GHOST_COLORS.length]!,
@@ -264,9 +252,6 @@ export default class ArenaSimulation {
     }
 
     private tickGhost(g: GhostState, step: number, scared: boolean): void {
-        // Try the current direction first. If a wall blocks us, force a new
-        // pick. We always re-decide at tile centers so ghosts can pick up
-        // intersections without overshooting.
         let nx = g.x + DX[g.dir] * step
         let ny = g.y + DY[g.dir] * step
         if (!canMoveTo(nx, ny)) {
@@ -283,8 +268,7 @@ export default class ArenaSimulation {
         if (tx !== g.lastTx || ty !== g.lastTy) {
             g.lastTx = tx
             g.lastTy = ty
-            // Re-evaluate direction at intersections, but not every tile —
-            // some inertia keeps motion readable.
+            // re-pick at some intersections, not every one — keeps motion readable
             if (Math.random() < 0.7) g.dir = this.pickGhostDir(g, scared)
         }
     }
@@ -295,8 +279,7 @@ export default class ArenaSimulation {
         const options: Direction[] = []
         for (const d of ALL_DIRS) {
             if (d === reverse) continue
-            // Peek into the next tile, not just one step ahead, so we don't
-            // pick a direction that wedges us against an immediate wall.
+            // peek further than one step so we don't wedge against a wall
             const peekX = g.x + DX[d] * (TILE_SIZE * 0.6)
             const peekY = g.y + DY[d] * (TILE_SIZE * 0.6)
             if (canMoveTo(peekX, peekY)) options.push(d)
@@ -343,7 +326,6 @@ export default class ArenaSimulation {
                 const dy = player.y - ghost.y
                 if (dx * dx + dy * dy > EAT_DISTANCE_SQ) continue
                 if (energized) {
-                    // Pacman chomps ghost — big points, ghost teleports home.
                     player.score += ARENA.ghostEatScore
                     const home = ghostHome()
                     ghost.x = home.x
@@ -352,7 +334,6 @@ export default class ArenaSimulation {
                     ghost.lastTx = ARENA.ghostHomeTx
                     ghost.lastTy = ARENA.ghostHomeTy
                 } else {
-                    // Ghost catches pacman — light penalty, respawn elsewhere.
                     player.score = Math.max(0, player.score - ARENA.deathPenalty)
                     const spawn = pickSpawn()
                     player.x = spawn.x
@@ -363,8 +344,6 @@ export default class ArenaSimulation {
         }
         return dirty
     }
-
-    // -- pellets --
 
     private regeneratePellets(): void {
         this.pellets.clear()

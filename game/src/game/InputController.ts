@@ -18,14 +18,8 @@ function equal(a: ArenaInput, b: ArenaInput): boolean {
     return a.up === b.up && a.down === b.down && a.left === b.left && a.right === b.right
 }
 
-/**
- * Reads the keyboard each frame, but only invokes the change callback when
- * the input vector actually flips (key pressed / released).
- *
- * Why bother? Rivalis ships with a default rate limiter (30 frames/sec per
- * actor). If we sent input every frame at 60 fps we'd hit the bucket. By
- * sending only on key state changes, a sustained key press is a single frame.
- */
+// fires onChange only when the input vector flips — keeps us under
+// the default 30 fps rate limiter
 export default class InputController {
     private keys: Keys
     private last: ArenaInput = { ...ZERO }

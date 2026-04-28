@@ -9,12 +9,6 @@ const EYE_OFFSET_Y = 3.5
 const PUPIL_DX: Record<Direction, number> = { up: 0, down: 0, left: -1.5, right: 1.5 }
 const PUPIL_DY: Record<Direction, number> = { up: -1.5, down: 1.5, left: 0, right: 0 }
 
-/**
- * One ghost. Drawn as a rounded "blob" with two googly eyes.
- *
- * Server tells us whether the ghost is scared (any pacman is energized).
- * In that case we re-tint the body dark blue.
- */
 export default class GhostSprite {
     private body: Phaser.GameObjects.Graphics
     private leftEye: Phaser.GameObjects.Arc
@@ -65,7 +59,7 @@ export default class GhostSprite {
         const cy = this.body.y
         this.leftEye.x = cx - EYE_OFFSET_X; this.leftEye.y = cy - EYE_OFFSET_Y
         this.rightEye.x = cx + EYE_OFFSET_X; this.rightEye.y = cy - EYE_OFFSET_Y
-        // Pupils nudge in direction of motion so the ghost looks where it's going.
+        // pupils look where the ghost is heading
         this.leftPupil.x = this.leftEye.x + PUPIL_DX[this.dir]
         this.leftPupil.y = this.leftEye.y + PUPIL_DY[this.dir]
         this.rightPupil.x = this.rightEye.x + PUPIL_DX[this.dir]
@@ -88,8 +82,7 @@ export default class GhostSprite {
         g.clear()
         g.fillStyle(fill, 1)
         g.lineStyle(1, stroke, 0.5)
-        // Rounded square: round top corners hard, leave bottom mostly square
-        // for the classic ghost silhouette.
+        // round top, square-ish bottom — classic ghost silhouette
         g.fillRoundedRect(-r, -r, r * 2, r * 2, { tl: r, tr: r, bl: 3, br: 3 })
         g.strokeRoundedRect(-r, -r, r * 2, r * 2, { tl: r, tr: r, bl: 3, br: 3 })
     }

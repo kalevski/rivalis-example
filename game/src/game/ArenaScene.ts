@@ -13,12 +13,6 @@ export type ArenaSceneCallbacks = {
     onScores: (players: ArenaPlayer[], myId: string) => void
 }
 
-/**
- * The Phaser scene. Pure game code:
- *   - knows nothing about Rivalis or WebSockets
- *   - receives state via `applySnapshot()` (called by main.ts)
- *   - reports input via the `onInput` callback
- */
 export default class ArenaScene extends Phaser.Scene {
     private callbacks: ArenaSceneCallbacks | null = null
     private input$: InputController | null = null
