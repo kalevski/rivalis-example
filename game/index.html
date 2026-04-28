@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Rivalis Pac-Maze — multiplayer pacman</title>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                background: #0f0f1a;
+                color: #eee;
+                font-family: system-ui, sans-serif;
+                height: 100%;
+                overflow: hidden;
+            }
+            #app {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 16px;
+                padding: 16px;
+                box-sizing: border-box;
+                max-width: 1100px;
+                margin: 0 auto;
+            }
+            #stage {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            #join {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            input {
+                padding: 6px 10px;
+                border-radius: 6px;
+                border: 1px solid #444;
+                background: #1c1c1c;
+                color: #eee;
+                font-size: 14px;
+            }
+            button {
+                padding: 6px 14px;
+                border-radius: 6px;
+                border: none;
+                background: #357;
+                color: white;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            button:disabled { opacity: 0.5; cursor: not-allowed; }
+            #status { font-size: 13px; color: #aaa; }
+            #game { border: 1px solid #2a2a44; border-radius: 8px; align-self: flex-start; }
+            #help { font-size: 12px; color: #777; }
+
+            #side {
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                width: 220px;
+                margin-top: 38px;
+            }
+            .panel {
+                background: #16162a;
+                border: 1px solid #2a2a44;
+                border-radius: 8px;
+                padding: 12px 14px;
+            }
+            .panel h2 {
+                font-size: 12px;
+                font-weight: 600;
+                color: #aaa;
+                margin: 0 0 8px;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+            #score {
+                font-size: 28px;
+                font-weight: 700;
+                color: #facc15;
+            }
+            #leaderboard {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                font-size: 14px;
+            }
+            #leaderboard li {
+                padding: 4px 0;
+                border-bottom: 1px solid #222;
+            }
+            #leaderboard li:last-child { border-bottom: none; }
+        </style>
+    </head>
+    <body>
+        <div id="app">
+            <div id="stage">
+                <div id="join">
+                    <input id="name" placeholder="display name" maxlength="20" />
+                    <button id="connect">Join</button>
+                    <button id="leave" disabled>Leave</button>
+                    <span id="status">not connected</span>
+                </div>
+                <div id="game"></div>
+                <div id="help">
+                    WASD or arrows to move. Dots +1, power pellets +5 (glow
+                    8s). While glowing: chomp other pacmen +10, eat ghosts
+                    +50. A ghost catching a non-glowing pacman costs 5 and
+                    a respawn.
+                </div>
+            </div>
+            <aside id="side">
+                <div class="panel">
+                    <h2>Your score</h2>
+                    <span id="score">—</span>
+                </div>
+                <div class="panel">
+                    <h2>Leaderboard</h2>
+                    <ol id="leaderboard"></ol>
+                </div>
+            </aside>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

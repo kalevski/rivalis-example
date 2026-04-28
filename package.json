@@ -1,0 +1,15 @@
+{
+    "name": "@rivalis-example/root",
+    "private": true,
+    "workspaces": ["protocol", "server", "game"],
+    "scripts": {
+        "dev": "concurrently -n server,game -c blue,green npm:dev:server npm:dev:game",
+        "dev:server": "npm run dev -w @rivalis-example/server",
+        "dev:game": "npm run dev -w @rivalis-example/game",
+        "build": "npm run build --workspaces --if-present"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.2",
+        "typescript": "^5.8.3"
+    }
+}
