@@ -1,25 +1,25 @@
-import * as Phaser from 'phaser'
+import { Scene } from '@toolcase/phaser-plus'
 import {
     type ArenaInput, type ArenaPlayer, type ArenaSnapshot
 } from '@rivalis-example/protocol'
-import InputController from './InputController'
-import PlayerSprite from './PlayerSprite'
-import PelletSprite from './PelletSprite'
-import GhostSprite from './GhostSprite'
-import MazeRenderer from './MazeRenderer'
+import PlayerSprite from './prefabs/PlayerSprite'
+import PelletSprite from './prefabs/PelletSprite'
+import GhostSprite from './prefabs/GhostSprite'
+import MazeFeature from './features/MazeFeature'
+import ArenaInputFeature from './features/ArenaInputFeature'
 
 export type ArenaSceneCallbacks = {
     onInput: (input: ArenaInput) => void
     onScores: (players: ArenaPlayer[], myId: string) => void
 }
 
-export default class ArenaScene extends Phaser.Scene {
+export default class ArenaScene extends Scene {
     private callbacks: ArenaSceneCallbacks | null = null
-    private input$: InputController | null = null
     private myId = ''
     private players = new Map<string, PlayerSprite>()
     private pellets = new Map<string, PelletSprite>()
     private ghosts = new Map<string, GhostSprite>()
+    private inputFeature!: ArenaInputFeature
 
     constructor() {
         super('arena')
@@ -27,6 +27,7 @@ export default class ArenaScene extends Phaser.Scene {
 
     setCallbacks(callbacks: ArenaSceneCallbacks): void {
         this.callbacks = callbacks
+        this.inputFeature?.onChange((input) => callbacks.onInput(input))
     }
 
     setLocalId(id: string): void {
@@ -42,25 +43,27 @@ export default class ArenaScene extends Phaser.Scene {
     }
 
     reset(): void {
-        for (const sprite of this.players.values()) sprite.destroy()
-        for (const sprite of this.pellets.values()) sprite.destroy()
-        for (const sprite of this.ghosts.values()) sprite.destroy()
+        for (const sprite of this.players.values()) this.pool.release(sprite)
+        for (const sprite of this.pellets.values()) this.pool.release(sprite)
+        for (const sprite of this.ghosts.values()) this.pool.release(sprite)
         this.players.clear()
         this.pellets.clear()
         this.ghosts.clear()
         this.myId = ''
-        this.input$?.reset()
+        this.inputFeature.reset()
     }
 
-    create(): void {
-        new MazeRenderer(this)
-        this.input$ = new InputController(this, (input) => this.callbacks?.onInput(input))
-    }
+    onCreate(): void {
+        this.pool.register(PlayerSprite.KEY, PlayerSprite, null, (obj) => obj.reset())
+        this.pool.register(GhostSprite.KEY, GhostSprite, null, (obj) => obj.reset())
+        this.pool.register(PelletSprite.KEY, PelletSprite, null, (obj) => obj.reset())
 
-    update(_time: number, delta: number): void {
-        this.input$?.sample()
-        for (const sprite of this.players.values()) sprite.update(delta)
-        for (const sprite of this.ghosts.values()) sprite.update(delta)
+        this.features.register(MazeFeature.KEY, MazeFeature)
+        this.inputFeature = this.features.register(ArenaInputFeature.KEY, ArenaInputFeature)
+        if (this.callbacks) {
+            const handler = this.callbacks.onInput
+            this.inputFeature.onChange((input) => handler(input))
+        }
     }
 
     private applyPlayers(remote: ArenaPlayer[], now: number): void {
@@ -74,15 +77,14 @@ export default class ArenaScene extends Phaser.Scene {
                 existing.setText(p.name, p.score)
                 existing.setEnergized(energized)
             } else {
-                const sprite = new PlayerSprite(this, p.x, p.y, p.color, p.name, p.score, p.id === this.myId)
-                sprite.setEnergized(energized)
-                sprite.setTarget(p.x, p.y, p.dir)
+                const sprite = this.pool.obtain<PlayerSprite>(PlayerSprite.KEY)!
+                sprite.init(p, p.id === this.myId, energized)
                 this.players.set(p.id, sprite)
             }
         }
         for (const [id, sprite] of this.players) {
             if (seen.has(id)) continue
-            sprite.destroy()
+            this.pool.release(sprite)
             this.players.delete(id)
         }
     }
@@ -92,11 +94,13 @@ export default class ArenaScene extends Phaser.Scene {
         for (const pellet of snapshot.pellets) {
             ids.add(pellet.id)
             if (this.pellets.has(pellet.id)) continue
-            this.pellets.set(pellet.id, new PelletSprite(this, pellet.x, pellet.y, pellet.power))
+            const sprite = this.pool.obtain<PelletSprite>(PelletSprite.KEY)!
+            sprite.init(pellet)
+            this.pellets.set(pellet.id, sprite)
         }
         for (const [id, sprite] of this.pellets) {
             if (ids.has(id)) continue
-            sprite.destroy()
+            this.pool.release(sprite)
             this.pellets.delete(id)
         }
     }
@@ -110,15 +114,14 @@ export default class ArenaScene extends Phaser.Scene {
                 existing.setTarget(g.x, g.y, g.dir)
                 existing.setScared(g.scared)
             } else {
-                const sprite = new GhostSprite(this, g.x, g.y, g.color)
-                sprite.setScared(g.scared)
-                sprite.setTarget(g.x, g.y, g.dir)
+                const sprite = this.pool.obtain<GhostSprite>(GhostSprite.KEY)!
+                sprite.init(g)
                 this.ghosts.set(g.id, sprite)
             }
         }
         for (const [id, sprite] of this.ghosts) {
             if (seen.has(id)) continue
-            sprite.destroy()
+            this.pool.release(sprite)
             this.ghosts.delete(id)
         }
     }

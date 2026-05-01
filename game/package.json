@@ -11,6 +11,9 @@
     "dependencies": {
         "@rivalis/browser": "*",
         "@rivalis-example/protocol": "*",
+        "@toolcase/base": "^2.0.0",
+        "@toolcase/logging": "^2.0.0",
+        "@toolcase/phaser-plus": "^2.0.2",
         "phaser": "^4.0.0"
     },
     "devDependencies": {

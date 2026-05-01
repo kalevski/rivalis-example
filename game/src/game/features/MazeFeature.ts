@@ -1,16 +1,20 @@
-import * as Phaser from 'phaser'
-import {
-    MAZE_COLS, MAZE_ROWS, TILE_SIZE,
-    isWallTile
-} from '@rivalis-example/protocol'
+import { GameObjects } from 'phaser'
+import { Feature } from '@toolcase/phaser-plus'
+import { MAZE_COLS, MAZE_ROWS, TILE_SIZE, isWallTile } from '@rivalis-example/protocol'
 
 const WALL_FILL = 0x1d4ed8
 const WALL_STROKE = 0x60a5fa
 const FLOOR = 0x0a0a18
 
-export default class MazeRenderer {
-    constructor(scene: Phaser.Scene) {
-        const g = scene.add.graphics()
+export default class MazeFeature extends Feature {
+    static readonly KEY = 'maze'
+
+    private gfx: GameObjects.Graphics | null = null
+
+    onCreate(): void {
+        const g = this.scene.add.graphics()
+        g.setDepth(-100)
+        this.gfx = g
 
         g.fillStyle(FLOOR, 1)
         g.fillRect(0, 0, MAZE_COLS * TILE_SIZE, MAZE_ROWS * TILE_SIZE)
@@ -26,5 +30,10 @@ export default class MazeRenderer {
                 g.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1)
             }
         }
+    }
+
+    onDestroy(): void {
+        this.gfx?.destroy()
+        this.gfx = null
     }
 }

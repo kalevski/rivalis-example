@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser'
+import { AUTO, Game } from 'phaser'
 import { ARENA, type ArenaPlayer } from '@rivalis-example/protocol'
 import ArenaClient from './net/ArenaClient'
 import ArenaScene from './game/ArenaScene'
@@ -9,14 +9,15 @@ const SERVER_URL = `ws://${location.hostname}:2334`
 const scene = new ArenaScene()
 const client = new ArenaClient()
 
-new Phaser.Game({
-    type: Phaser.AUTO,
+const game = new Game({
+    type: AUTO,
     width: ARENA.width,
     height: ARENA.height,
     parent: 'game',
-    backgroundColor: '#1a1a2e',
-    scene: [scene]
+    backgroundColor: '#1a1a2e'
 })
+game.scene.add('arena', scene)
+game.scene.start('arena')
 
 let myId = ''
 let myScore: number | null = null
