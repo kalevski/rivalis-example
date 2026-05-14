@@ -1,13 +1,14 @@
-import http from 'http'
+// Node 18 doesn't expose WebCrypto as `globalThis.crypto` for script entries;
+// @toolcase/base's generateId requires it. Safe to delete once on Node 19+.
 import { webcrypto } from 'node:crypto'
-import { Rivalis, Transports } from '@rivalis/core'
-
-// Node <19 lacks globalThis.crypto; rivalis/core's id generator needs it.
-if (!(globalThis as { crypto?: unknown }).crypto) {
-    (globalThis as { crypto: unknown }).crypto = webcrypto
+if (typeof globalThis.crypto === 'undefined') {
+    Object.defineProperty(globalThis, 'crypto', { value: webcrypto })
 }
+
+import http from 'http'
+import { Rivalis, Transports } from '@rivalis/core'
 import { ARENA_ROOM_ID } from '@rivalis-example/protocol'
-import Auth, { type ActorData } from './auth/AuthMiddleware'
+import ArenaAuth, { type ActorData } from './auth/AuthMiddleware'
 import ArenaRoom from './rivalis/ArenaRoom'
 
 const PORT = 2334
@@ -19,7 +20,7 @@ const server = http.createServer((_, res) => {
 
 const rivalis = new Rivalis<ActorData>({
     transports: [new Transports.WSTransport({ server })],
-    authMiddleware: new Auth()
+    authMiddleware: new ArenaAuth()
 })
 
 rivalis.rooms.define('arena', ArenaRoom)

@@ -14,6 +14,8 @@ export const ARENA = {
     energizedMs: 8000,
     eatDistance: 24,
     pelletPickupDistance: 12,
+    dotScore: 1,
+    powerPelletScore: 5,
     ghostEatScore: 50,
     chompScore: 10,
     deathPenalty: 5

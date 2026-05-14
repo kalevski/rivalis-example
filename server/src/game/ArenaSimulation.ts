@@ -102,8 +102,8 @@ export default class ArenaSimulation {
     }
 
     setInput(id: string, input: ArenaInput): void {
-        const p = this.players.get(id)
-        if (p) p.input = input
+        const player = this.players.get(id)
+        if (player) player.input = input
     }
 
     tick(dtMs: number): ArenaSnapshot | null {
@@ -113,17 +113,17 @@ export default class ArenaSimulation {
         const playerStep = ARENA.speed * dt
         let dirty = false
 
-        for (const p of this.players.values()) {
-            if (this.movePlayer(p, playerStep)) dirty = true
-            if (this.consumePelletAt(p, now)) dirty = true
+        for (const player of this.players.values()) {
+            if (this.movePlayer(player, playerStep)) dirty = true
+            if (this.consumePelletAt(player, now)) dirty = true
         }
 
         if (this.resolvePlayerCollisions(now)) dirty = true
 
         const anyEnergized = this.isAnyEnergized(now)
         const ghostStep = (anyEnergized ? ARENA.ghostScaredSpeed : ARENA.ghostSpeed) * dt
-        for (const g of this.ghosts) {
-            this.tickGhost(g, ghostStep, anyEnergized)
+        for (const ghost of this.ghosts) {
+            this.tickGhost(ghost, ghostStep, anyEnergized)
             dirty = true
         }
 
@@ -164,40 +164,42 @@ export default class ArenaSimulation {
         return { t: now, players, pellets: [...this.pellets.values()], ghosts }
     }
 
-    private movePlayer(p: Player, step: number): boolean {
-        const requested = dirFromInput(p.input)
+    private movePlayer(player: Player, step: number): boolean {
+        const requested = dirFromInput(player.input)
         if (requested === null) return false
         // try requested dir, fall back to current — keeps gliding through corridors
         const tryOrder: Direction[] = [requested]
-        if (requested !== p.dir) tryOrder.push(p.dir)
+        if (requested !== player.dir) tryOrder.push(player.dir)
 
-        for (const d of tryOrder) {
-            const nx = p.x + DX[d] * step
-            const ny = p.y + DY[d] * step
+        for (const dir of tryOrder) {
+            const nx = player.x + DX[dir] * step
+            const ny = player.y + DY[dir] * step
             if (canMoveTo(nx, ny)) {
-                p.x = nx; p.y = ny; p.dir = d
+                player.x = nx
+                player.y = ny
+                player.dir = dir
                 return true
             }
         }
         return false
     }
 
-    private consumePelletAt(p: Player, now: number): boolean {
-        const tx = Math.floor(p.x / TILE_SIZE)
-        const ty = Math.floor(p.y / TILE_SIZE)
+    private consumePelletAt(player: Player, now: number): boolean {
+        const tx = Math.floor(player.x / TILE_SIZE)
+        const ty = Math.floor(player.y / TILE_SIZE)
         const key = `${tx},${ty}`
         const pellet = this.pellets.get(key)
         if (!pellet) return false
-        const dx = p.x - pellet.x
-        const dy = p.y - pellet.y
+        const dx = player.x - pellet.x
+        const dy = player.y - pellet.y
         if (dx * dx + dy * dy > PELLET_PICKUP_SQ) return false
 
         this.pellets.delete(key)
         if (pellet.power) {
-            p.score += 5
-            p.energizedUntil = now + ARENA.energizedMs
+            player.score += ARENA.powerPelletScore
+            player.energizedUntil = now + ARENA.energizedMs
         } else {
-            p.score += 1
+            player.score += ARENA.dotScore
         }
         return true
     }
@@ -212,10 +214,10 @@ export default class ArenaSimulation {
                 const dx = a.x - b.x
                 const dy = a.y - b.y
                 if (dx * dx + dy * dy > EAT_DISTANCE_SQ) continue
-                const aE = a.energizedUntil > now
-                const bE = b.energizedUntil > now
-                if (aE && !bE) { this.chompPlayer(a, b); dirty = true }
-                else if (bE && !aE) { this.chompPlayer(b, a); dirty = true }
+                const aEnergized = a.energizedUntil > now
+                const bEnergized = b.energizedUntil > now
+                if (aEnergized && !bEnergized) { this.chompPlayer(a, b); dirty = true }
+                else if (bEnergized && !aEnergized) { this.chompPlayer(b, a); dirty = true }
             }
         }
         return dirty
@@ -223,15 +225,28 @@ export default class ArenaSimulation {
 
     private chompPlayer(eater: Player, victim: Player): void {
         eater.score += ARENA.chompScore
-        victim.score = Math.max(0, victim.score - ARENA.deathPenalty)
+        this.respawnPlayer(victim)
+    }
+
+    private respawnPlayer(player: Player): void {
+        player.score = Math.max(0, player.score - ARENA.deathPenalty)
         const { x, y } = pickSpawn()
-        victim.x = x
-        victim.y = y
+        player.x = x
+        player.y = y
+    }
+
+    private sendGhostHome(ghost: GhostState): void {
+        const { x, y } = ghostHome()
+        ghost.x = x
+        ghost.y = y
+        ghost.dir = pickRandom(ALL_DIRS)
+        ghost.lastTx = ARENA.ghostHomeTx
+        ghost.lastTy = ARENA.ghostHomeTy
     }
 
     private isAnyEnergized(now: number): boolean {
-        for (const p of this.players.values()) {
-            if (p.energizedUntil > now) return true
+        for (const player of this.players.values()) {
+            if (player.energizedUntil > now) return true
         }
         return false
     }
@@ -251,68 +266,64 @@ export default class ArenaSimulation {
         }
     }
 
-    private tickGhost(g: GhostState, step: number, scared: boolean): void {
-        let nx = g.x + DX[g.dir] * step
-        let ny = g.y + DY[g.dir] * step
+    private tickGhost(ghost: GhostState, step: number, scared: boolean): void {
+        let nx = ghost.x + DX[ghost.dir] * step
+        let ny = ghost.y + DY[ghost.dir] * step
         if (!canMoveTo(nx, ny)) {
-            g.dir = this.pickGhostDir(g, scared)
-            nx = g.x + DX[g.dir] * step
-            ny = g.y + DY[g.dir] * step
+            ghost.dir = this.pickGhostDir(ghost, scared)
+            nx = ghost.x + DX[ghost.dir] * step
+            ny = ghost.y + DY[ghost.dir] * step
             if (!canMoveTo(nx, ny)) return
         }
-        g.x = nx
-        g.y = ny
+        ghost.x = nx
+        ghost.y = ny
 
-        const tx = Math.floor(g.x / TILE_SIZE)
-        const ty = Math.floor(g.y / TILE_SIZE)
-        if (tx !== g.lastTx || ty !== g.lastTy) {
-            g.lastTx = tx
-            g.lastTy = ty
+        const tx = Math.floor(ghost.x / TILE_SIZE)
+        const ty = Math.floor(ghost.y / TILE_SIZE)
+        if (tx !== ghost.lastTx || ty !== ghost.lastTy) {
+            ghost.lastTx = tx
+            ghost.lastTy = ty
             // re-pick at some intersections, not every one — keeps motion readable
-            if (Math.random() < 0.7) g.dir = this.pickGhostDir(g, scared)
+            if (Math.random() < 0.7) ghost.dir = this.pickGhostDir(ghost, scared)
         }
     }
 
-    private pickGhostDir(g: GhostState, scared: boolean): Direction {
-        const target = this.nearestPacman(g)
-        const reverse = REVERSE[g.dir]
+    private pickGhostDir(ghost: GhostState, scared: boolean): Direction {
+        const target = this.nearestPacman(ghost)
+        const reverse = REVERSE[ghost.dir]
         const options: Direction[] = []
-        for (const d of ALL_DIRS) {
-            if (d === reverse) continue
+        for (const dir of ALL_DIRS) {
+            if (dir === reverse) continue
             // peek further than one step so we don't wedge against a wall
-            const peekX = g.x + DX[d] * (TILE_SIZE * 0.6)
-            const peekY = g.y + DY[d] * (TILE_SIZE * 0.6)
-            if (canMoveTo(peekX, peekY)) options.push(d)
+            const peekX = ghost.x + DX[dir] * (TILE_SIZE * 0.6)
+            const peekY = ghost.y + DY[dir] * (TILE_SIZE * 0.6)
+            if (canMoveTo(peekX, peekY)) options.push(dir)
         }
         if (options.length === 0) return reverse
-
         if (!target) return pickRandom(options)
 
+        const sign = scared ? -1 : 1
         let best = options[0]!
-        let bestScore = scared ? -Infinity : Infinity
-        for (const d of options) {
-            const peekX = g.x + DX[d] * TILE_SIZE
-            const peekY = g.y + DY[d] * TILE_SIZE
+        let bestScore = Infinity
+        for (const dir of options) {
+            const peekX = ghost.x + DX[dir] * TILE_SIZE
+            const peekY = ghost.y + DY[dir] * TILE_SIZE
             const dx = target.x - peekX
             const dy = target.y - peekY
-            const dist = dx * dx + dy * dy
-            if (scared) {
-                if (dist > bestScore) { best = d; bestScore = dist }
-            } else {
-                if (dist < bestScore) { best = d; bestScore = dist }
-            }
+            const score = sign * (dx * dx + dy * dy)
+            if (score < bestScore) { best = dir; bestScore = score }
         }
         return best
     }
 
-    private nearestPacman(g: GhostState): Player | null {
+    private nearestPacman(ghost: GhostState): Player | null {
         let best: Player | null = null
         let bestDist = Infinity
-        for (const p of this.players.values()) {
-            const dx = p.x - g.x
-            const dy = p.y - g.y
+        for (const player of this.players.values()) {
+            const dx = player.x - ghost.x
+            const dy = player.y - ghost.y
             const dist = dx * dx + dy * dy
-            if (dist < bestDist) { best = p; bestDist = dist }
+            if (dist < bestDist) { best = player; bestDist = dist }
         }
         return best
     }
@@ -327,17 +338,9 @@ export default class ArenaSimulation {
                 if (dx * dx + dy * dy > EAT_DISTANCE_SQ) continue
                 if (energized) {
                     player.score += ARENA.ghostEatScore
-                    const home = ghostHome()
-                    ghost.x = home.x
-                    ghost.y = home.y
-                    ghost.dir = pickRandom(ALL_DIRS)
-                    ghost.lastTx = ARENA.ghostHomeTx
-                    ghost.lastTy = ARENA.ghostHomeTy
+                    this.sendGhostHome(ghost)
                 } else {
-                    player.score = Math.max(0, player.score - ARENA.deathPenalty)
-                    const spawn = pickSpawn()
-                    player.x = spawn.x
-                    player.y = spawn.y
+                    this.respawnPlayer(player)
                 }
                 dirty = true
             }
@@ -347,10 +350,10 @@ export default class ArenaSimulation {
 
     private regeneratePellets(): void {
         this.pellets.clear()
-        for (const p of listPelletTiles()) {
-            const id = `${p.tx},${p.ty}`
-            const c = tileCenter(p.tx, p.ty)
-            this.pellets.set(id, { id, x: c.x, y: c.y, power: p.power })
+        for (const tile of listPelletTiles()) {
+            const id = `${tile.tx},${tile.ty}`
+            const center = tileCenter(tile.tx, tile.ty)
+            this.pellets.set(id, { id, x: center.x, y: center.y, power: tile.power })
         }
     }
 }

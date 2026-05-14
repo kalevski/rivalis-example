@@ -8,6 +8,22 @@ import ArenaSimulation from '../game/ArenaSimulation'
 
 const TICK_MS = Math.round(1000 / ARENA.tickHz)
 
+const ZERO_INPUT: ArenaInput = { up: false, down: false, left: false, right: false }
+
+function parseInput(payload: Uint8Array): ArenaInput {
+    try {
+        const raw = decode<Partial<ArenaInput>>(payload)
+        return {
+            up: raw.up === true,
+            down: raw.down === true,
+            left: raw.left === true,
+            right: raw.right === true
+        }
+    } catch {
+        return ZERO_INPUT
+    }
+}
+
 export default class ArenaRoom extends Room<ActorData> {
     protected override presence = true
 
@@ -22,7 +38,7 @@ export default class ArenaRoom extends Room<ActorData> {
 
         this.lastTickAt = Date.now()
         this.tickHandle = setInterval(() => this.tick(), TICK_MS)
-        this.tickHandle.unref?.()
+        this.tickHandle.unref()
     }
 
     protected override onJoin(actor: Actor<ActorData>): void {
@@ -51,14 +67,7 @@ export default class ArenaRoom extends Room<ActorData> {
     }
 
     private onInput(actor: Actor<ActorData>, payload: Uint8Array): void {
-        let raw: Partial<ArenaInput>
-        try { raw = decode<Partial<ArenaInput>>(payload) } catch { return }
-        this.sim.setInput(actor.id, {
-            up: raw.up === true,
-            down: raw.down === true,
-            left: raw.left === true,
-            right: raw.right === true
-        })
+        this.sim.setInput(actor.id, parseInput(payload))
     }
 
     private tick(): void {

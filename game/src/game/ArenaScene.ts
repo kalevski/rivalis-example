@@ -1,4 +1,4 @@
-import { Scene } from '@toolcase/phaser-plus'
+import { Scene, GameObject } from '@toolcase/phaser-plus'
 import {
     type ArenaInput, type ArenaPlayer, type ArenaSnapshot
 } from '@rivalis-example/protocol'
@@ -12,6 +12,8 @@ export type ArenaSceneCallbacks = {
     onInput: (input: ArenaInput) => void
     onScores: (players: ArenaPlayer[], myId: string) => void
 }
+
+type WithId = { id: string }
 
 export default class ArenaScene extends Scene {
     private callbacks: ArenaSceneCallbacks | null = null
@@ -35,9 +37,30 @@ export default class ArenaScene extends Scene {
     }
 
     applySnapshot(snapshot: ArenaSnapshot): void {
-        this.applyPlayers(snapshot.players, snapshot.t)
-        this.applyPellets(snapshot)
-        this.applyGhosts(snapshot)
+        const now = snapshot.t
+
+        this.syncMap(this.players, PlayerSprite.KEY, snapshot.players,
+            (sprite, p) => {
+                sprite.setTarget(p.x, p.y, p.dir)
+                sprite.setText(p.name, p.score)
+                sprite.setEnergized(p.energizedUntil > now)
+            },
+            (sprite, p) => sprite.init(p, p.id === this.myId, p.energizedUntil > now)
+        )
+
+        this.syncMap(this.pellets, PelletSprite.KEY, snapshot.pellets,
+            null,
+            (sprite, pellet) => sprite.init(pellet)
+        )
+
+        this.syncMap(this.ghosts, GhostSprite.KEY, snapshot.ghosts,
+            (sprite, g) => {
+                sprite.setTarget(g.x, g.y, g.dir)
+                sprite.setScared(g.scared)
+            },
+            (sprite, g) => sprite.init(g)
+        )
+
         this.callbacks?.onScores(snapshot.players, this.myId)
     }
 
@@ -65,63 +88,30 @@ export default class ArenaScene extends Scene {
         }
     }
 
-    private applyPlayers(remote: ArenaPlayer[], now: number): void {
+    /** Reconcile a sprite map against an incoming snapshot list keyed by `id`. */
+    private syncMap<R extends WithId, S extends GameObject>(
+        map: Map<string, S>,
+        poolKey: string,
+        remote: ReadonlyArray<R>,
+        update: ((sprite: S, item: R) => void) | null,
+        create: (sprite: S, item: R) => void
+    ): void {
         const seen = new Set<string>()
-        for (const p of remote) {
-            seen.add(p.id)
-            const energized = p.energizedUntil > now
-            const existing = this.players.get(p.id)
+        for (const item of remote) {
+            seen.add(item.id)
+            const existing = map.get(item.id)
             if (existing) {
-                existing.setTarget(p.x, p.y, p.dir)
-                existing.setText(p.name, p.score)
-                existing.setEnergized(energized)
+                update?.(existing, item)
             } else {
-                const sprite = this.pool.obtain<PlayerSprite>(PlayerSprite.KEY)!
-                sprite.init(p, p.id === this.myId, energized)
-                this.players.set(p.id, sprite)
+                const sprite = this.pool.obtain<S>(poolKey)!
+                create(sprite, item)
+                map.set(item.id, sprite)
             }
         }
-        for (const [id, sprite] of this.players) {
+        for (const [id, sprite] of map) {
             if (seen.has(id)) continue
             this.pool.release(sprite)
-            this.players.delete(id)
-        }
-    }
-
-    private applyPellets(snapshot: ArenaSnapshot): void {
-        const ids = new Set<string>()
-        for (const pellet of snapshot.pellets) {
-            ids.add(pellet.id)
-            if (this.pellets.has(pellet.id)) continue
-            const sprite = this.pool.obtain<PelletSprite>(PelletSprite.KEY)!
-            sprite.init(pellet)
-            this.pellets.set(pellet.id, sprite)
-        }
-        for (const [id, sprite] of this.pellets) {
-            if (ids.has(id)) continue
-            this.pool.release(sprite)
-            this.pellets.delete(id)
-        }
-    }
-
-    private applyGhosts(snapshot: ArenaSnapshot): void {
-        const seen = new Set<string>()
-        for (const g of snapshot.ghosts) {
-            seen.add(g.id)
-            const existing = this.ghosts.get(g.id)
-            if (existing) {
-                existing.setTarget(g.x, g.y, g.dir)
-                existing.setScared(g.scared)
-            } else {
-                const sprite = this.pool.obtain<GhostSprite>(GhostSprite.KEY)!
-                sprite.init(g)
-                this.ghosts.set(g.id, sprite)
-            }
-        }
-        for (const [id, sprite] of this.ghosts) {
-            if (seen.has(id)) continue
-            this.pool.release(sprite)
-            this.ghosts.delete(id)
+            map.delete(id)
         }
     }
 }

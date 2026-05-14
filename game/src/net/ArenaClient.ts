@@ -14,29 +14,26 @@ export type ArenaClientEvents = {
     presenceLeave: (event: PresenceEvent) => void
 }
 
-type Listener<K extends keyof ArenaClientEvents> = ArenaClientEvents[K]
+type EventName = keyof ArenaClientEvents
+type Listener<K extends EventName> = ArenaClientEvents[K]
+type ListenerMap = { [K in EventName]?: Listener<K>[] }
 
 const decoder = new TextDecoder()
 
 export default class ArenaClient {
     private ws: WSClient | null = null
-    private listeners: { [K in keyof ArenaClientEvents]?: Listener<K>[] } = {}
+    private listeners: ListenerMap = {}
 
-    on<K extends keyof ArenaClientEvents>(event: K, fn: Listener<K>): void {
-        ;(this.listeners[event] ??= [] as Listener<K>[]).push(fn)
+    on<K extends EventName>(event: K, fn: Listener<K>): void {
+        const list = (this.listeners[event] ??= []) as Listener<K>[]
+        list.push(fn)
     }
 
-    off<K extends keyof ArenaClientEvents>(event: K, fn: Listener<K>): void {
-        const arr = this.listeners[event]
-        if (!arr) return
-        const i = arr.indexOf(fn)
-        if (i >= 0) arr.splice(i, 1)
-    }
-
-    private emit<K extends keyof ArenaClientEvents>(event: K, ...args: Parameters<Listener<K>>): void {
-        const arr = this.listeners[event]
-        if (!arr) return
-        for (const fn of arr) (fn as (...a: unknown[]) => void)(...args)
+    off<K extends EventName>(event: K, fn: Listener<K>): void {
+        const list = this.listeners[event] as Listener<K>[] | undefined
+        if (!list) return
+        const i = list.indexOf(fn)
+        if (i >= 0) list.splice(i, 1)
     }
 
     connect(url: string, ticket: string): void {
@@ -70,5 +67,12 @@ export default class ArenaClient {
     sendInput(input: ArenaInput): void {
         if (!this.ws) return
         this.ws.send('input', encode(input))
+    }
+
+    private emit<K extends EventName>(event: K, ...args: Parameters<Listener<K>>): void {
+        const list = this.listeners[event] as Listener<K>[] | undefined
+        if (!list) return
+        type Fn = (...a: Parameters<Listener<K>>) => void
+        for (const fn of list) (fn as Fn)(...args)
     }
 }

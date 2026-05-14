@@ -1,5 +1,4 @@
-import { Feature } from '@toolcase/phaser-plus'
-import { InputFeature } from '@toolcase/phaser-plus'
+import { Feature, InputFeature } from '@toolcase/phaser-plus'
 import type { ArenaInput } from '@rivalis-example/protocol'
 
 export type InputChangeHandler = (input: ArenaInput) => void

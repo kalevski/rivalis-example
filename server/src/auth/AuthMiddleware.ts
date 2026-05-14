@@ -15,7 +15,7 @@ function pickColor(name: string): string {
     return PALETTE[h % PALETTE.length]!
 }
 
-export default class Auth extends AuthMiddleware<ActorData> {
+export default class ArenaAuth extends AuthMiddleware<ActorData> {
     override async authenticate(ticket: string): Promise<AuthResult<ActorData> | null> {
         const name = ticket.trim()
         if (!name || name.length > 20) return null
