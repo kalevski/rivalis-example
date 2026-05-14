@@ -34,6 +34,7 @@ export default class PelletSprite extends GameObject {
         this.setVisible(false)
         this.setActive(false)
         this.stopTween()
+        this.power = false
     }
 
     onDestroy(): void {
@@ -41,9 +42,6 @@ export default class PelletSprite extends GameObject {
     }
 
     private applyKind(power: boolean): void {
-        if (this.power === power && this.dot.fillColor !== undefined) {
-            return
-        }
         this.power = power
         this.stopTween()
         if (power) {

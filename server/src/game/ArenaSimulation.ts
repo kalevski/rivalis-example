@@ -166,9 +166,9 @@ export default class ArenaSimulation {
 
     private movePlayer(p: Player, step: number): boolean {
         const requested = dirFromInput(p.input)
+        if (requested === null) return false
         // try requested dir, fall back to current — keeps gliding through corridors
-        const tryOrder: Direction[] = []
-        if (requested) tryOrder.push(requested)
+        const tryOrder: Direction[] = [requested]
         if (requested !== p.dir) tryOrder.push(p.dir)
 
         for (const d of tryOrder) {

@@ -46,8 +46,7 @@ export default class GhostSprite extends GameObject {
         this.targetX = ghost.x
         this.targetY = ghost.y
         this.dir = ghost.dir
-        this.scared = !ghost.scared
-        this.setScared(ghost.scared)
+        this.scared = ghost.scared
         this.setVisible(true)
         this.setActive(true)
         this.draw()

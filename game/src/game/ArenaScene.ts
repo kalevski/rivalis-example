@@ -35,8 +35,7 @@ export default class ArenaScene extends Scene {
     }
 
     applySnapshot(snapshot: ArenaSnapshot): void {
-        const now = Date.now()
-        this.applyPlayers(snapshot.players, now)
+        this.applyPlayers(snapshot.players, snapshot.t)
         this.applyPellets(snapshot)
         this.applyGhosts(snapshot)
         this.callbacks?.onScores(snapshot.players, this.myId)
